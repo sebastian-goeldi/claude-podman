@@ -1,13 +1,45 @@
-#!/bin/sh
+#!/bin/bash
 
 # Default image
 IMAGE="ghcr.io/evancarroll/claude-podman/claude-code:latest"
+NAME="claudecode-$(uuidgen -r | cut -d- -f1)"
+INIT_SCRIPT=""
+APK_PACKAGES=""
 
-# Check for --local flag
-if [ "$1" = "--local" ]; then
-	IMAGE="claude-code:latest"
-	shift
-fi
+# Process arguments
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--help)
+		cat <<-'EOT'
+			Usage: claude [OPTIONS]
+
+			Run Claude Code in a Podman container
+
+			Options:
+			  --local              Use local image 'claude-code:latest' instead of remote
+			  --init-script FILE   Execute initialization script
+			  --apk-packages LIST  Install additional Alpine packages (comma or space separated)
+			  --help               Display this help message
+		EOT
+		exit 0
+		;;
+	--local)
+		IMAGE="claude-code:latest"
+		shift
+		;;
+	--init-script)
+		INIT_SCRIPT="$2"
+		shift 2
+		;;
+	--apk-packages)
+		APK_PACKAGES="$2"
+		shift 2
+		;;
+	*)
+		break
+		;;
+	esac
+done
 
 podman run \
 	-v "${HOME}/.claude:/home/claude/.claude" \
@@ -15,7 +47,20 @@ podman run \
 	-v "${PWD}:${PWD}" \
 	-w "$PWD" \
 	--rm \
+	--name "$NAME" \
 	-ti \
+	--detach \
 	--user claude \
 	--userns=keep-id:uid=1001,gid=1001 \
 	"$IMAGE" "$@"
+
+if [ -n "$APK_PACKAGES" ]; then
+	APK_PACKAGES=$(echo $APK_PACKAGES | tr -s ', ' ' ')
+	podman exec --user root:root "$NAME" /bin/zsh -c "apk update; apk add $APK_PACKAGES"
+fi
+if [ -n "$INIT_SCRIPT" ]; then
+	podman cp "$INIT_SCRIPT" "$NAME:/root/init.sh"
+	podman exec --user root:root "$NAME" zsh /root/init.sh
+fi
+
+podman container attach "$NAME"

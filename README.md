@@ -17,7 +17,7 @@ sudo chmod a+x /usr/local/bin/claude-podman
 
 Now you can just run `claude-podman`.
 
-Benefit
+Benefits
 ----
 
 This provides the following benefits:
@@ -31,3 +31,13 @@ This provides the following benefits:
 This image runs in rootless podman, and even inside rootless podman it runs as
 a non-root user inside the container. Claude code is maximally locked down and
 can't even update itself!
+
+Customizing the runtime
+----
+
+Need to add packages to the container, or run an init script? no problem
+
+```
+--apk-packages foo,bar,baz # adds packages foo, bar, baz, with apk
+--init-script  ./foobar.sh # copies foobar.sh into the container and executes it as root
+```
