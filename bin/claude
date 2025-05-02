@@ -5,6 +5,7 @@ IMAGE="ghcr.io/evancarroll/claude-podman/claude-code:latest"
 NAME="claudecode-$(uuidgen -r | cut -d- -f1)"
 INIT_SCRIPT=""
 APK_PACKAGES=""
+PODMAN_ARGS=""
 
 # Process arguments
 while [[ $# -gt 0 ]]; do
@@ -19,6 +20,7 @@ while [[ $# -gt 0 ]]; do
 			  --local              Use local image 'claude-code:latest' instead of remote
 			  --init-script FILE   Execute initialization script
 			  --apk-packages LIST  Install additional Alpine packages (comma or space separated)
+			  --podman-arg ARG     Pass additional argument to podman
 			  --help               Display this help message
 		EOT
 		exit 0
@@ -33,6 +35,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--apk-packages)
 		APK_PACKAGES="$2"
+		shift 2
+		;;
+	--podman-arg)
+		PODMAN_ARGS="$PODMAN_ARGS $2"
 		shift 2
 		;;
 	*)
@@ -52,6 +58,7 @@ podman run \
 	--detach \
 	--user claude \
 	--userns=keep-id:uid=1001,gid=1001 \
+	$PODMAN_ARGS \
 	"$IMAGE" "$@"
 
 if [ -n "$APK_PACKAGES" ]; then
@@ -64,3 +71,4 @@ if [ -n "$INIT_SCRIPT" ]; then
 fi
 
 podman container attach "$NAME"
+

@@ -41,3 +41,12 @@ Need to add packages to the container, or run an init script? no problem
 --apk-packages foo,bar,baz # adds packages foo, bar, baz, with apk
 --init-script  ./foobar.sh # copies foobar.sh into the container and executes it as root
 ```
+
+
+For example, let's say you're using kubernetes and you do want claude to be able to troubleshoot it.
+
+```sh
+claude-podman \
+	--apk-packages kubectl \
+	--podman-arg "-v $HOME/.kube/config:/home/claude/.kube/config"
+```
