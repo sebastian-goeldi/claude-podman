@@ -25,6 +25,14 @@ while [[ $# -gt 0 ]]; do
 		EOT
 		exit 0
 		;;
+	--self-update)
+		curl --proto '=https' --tlsv1.2 -sSf \
+			https://raw.githubusercontent.com/EvanCarroll/claude-podman/refs/heads/main/bin/claude |
+			sudo tee /usr/local/bin/claude-podman >/dev/null
+		sudo chmod a+x /usr/local/bin/claude-podman
+		echo "Updated"
+		exit 0
+		;;
 	--local)
 		IMAGE="claude-code:latest"
 		shift
@@ -71,4 +79,3 @@ if [ -n "$INIT_SCRIPT" ]; then
 fi
 
 podman container attach "$NAME"
-
