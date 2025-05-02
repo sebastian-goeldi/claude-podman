@@ -29,4 +29,6 @@ buildah commit \
 
 buildah tag "$IMAGE" "$CLAUDE_VERSION"
 
-echo To use the image [${IMAGE}:${CLAUDE_VERSION}] run /bin/claude
+echo Done!
+echo ${IMAGE}:${CLAUDE_VERSION}
+echo To use this image run /bin/claude
