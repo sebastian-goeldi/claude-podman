@@ -1,15 +1,13 @@
 #!/bin/sh
 
-echo podman run \
-	-v "${HOME}/.claude:/home/claude/.claude" \
-	-v "${HOME}/.claude.json:/home/claude/.claude.json" \
-	-v "${PWD}:${PWD}" \
-	-w "$PWD" \
-	--rm \
-	-ti \
-	--user claude \
-	--userns=keep-id:uid=1001,gid=1001 \
-	claude-code:latest
+# Default image
+IMAGE="ghcr.io/evancarroll/claude-podman/claude-code:latest"
+
+# Check for --local flag
+if [ "$1" = "--local" ]; then
+	IMAGE="claude-code:latest"
+	shift
+fi
 
 podman run \
 	-v "${HOME}/.claude:/home/claude/.claude" \
@@ -20,4 +18,4 @@ podman run \
 	-ti \
 	--user claude \
 	--userns=keep-id:uid=1001,gid=1001 \
-	claude-code:latest
+	"$IMAGE" "$@"
