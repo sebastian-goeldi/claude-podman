@@ -1,0 +1,23 @@
+#!/bin/sh
+
+echo podman run \
+	-v "${HOME}/.claude:/home/claude/.claude" \
+	-v "${HOME}/.claude.json:/home/claude/.claude.json" \
+	-v "${PWD}:${PWD}" \
+	-w "$PWD" \
+	--rm \
+	-ti \
+	--user claude \
+	--userns=keep-id:uid=1001,gid=1001 \
+	claude-code:latest
+
+podman run \
+	-v "${HOME}/.claude:/home/claude/.claude" \
+	-v "${HOME}/.claude.json:/home/claude/.claude.json" \
+	-v "${PWD}:${PWD}" \
+	-w "$PWD" \
+	--rm \
+	-ti \
+	--user claude \
+	--userns=keep-id:uid=1001,gid=1001 \
+	claude-code:latest
