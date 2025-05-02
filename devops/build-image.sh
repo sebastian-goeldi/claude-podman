@@ -21,6 +21,14 @@ buildah config \
 	--env "SHELL=/usr/bin/zsh" \
 	--cmd "" \
 	--entrypoint '[ "/usr/local/bin/node", "--no-warnings", "--enable-source-maps", "/usr/local/bin/claude" ]' \
+	--annotation "org.anthropic.claudecode.version=$CLAUDE_VERSION" \
+	--annotation "org.opencontainers.image.title=claude-code" \
+	--annotation "org.opencontainers.image.description=Claude Code on Alpine ready for rootless podman" \
+	--annotation "org.opencontainers.image.url=https://github.com/EvanCarroll/claude-podman" \
+	--annotation "org.opencontainers.image.source=https://github.com/EvanCarroll/claude-podman" \
+	--annotation "org.opencontainers.image.documentation=https://github.com/EvanCarroll/claude-podman/blob/main/README.md" \
+	--annotation "org.opencontainers.image.license=AGPL-3.0-or-later" \
+	--annotation "org.opencontainers.image.created=$(date --iso-8601=seconds)" \
 	"$CONTAINER"
 
 buildah commit \
