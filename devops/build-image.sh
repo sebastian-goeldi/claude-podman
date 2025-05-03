@@ -19,6 +19,8 @@ buildah config \
 	--author "Evan Carroll" \
 	--env "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
 	--env "SHELL=/usr/bin/zsh" \
+	--env "DISABLE_TELEMETRY=1" \
+	--env "DISABLE_AUTOUPDATER=1" \
 	--cmd "" \
 	--entrypoint '[ "/usr/local/bin/node", "--no-warnings", "--enable-source-maps", "/usr/local/bin/claude" ]' \
 	--annotation "org.anthropic.claudecode.version=$CLAUDE_VERSION" \
