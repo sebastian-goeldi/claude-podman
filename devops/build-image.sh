@@ -7,12 +7,13 @@ IMAGE=claude-code
 #apk add --no-cache dash
 buildah run "$CONTAINER" sh <<EOT
 	npm config set os linux
-	apk add --no-cache zsh
+	apk add --no-cache zsh bash coreutils git sudo
 	npm --os=linux install --omit=dev --no-audit --no-fund -g @anthropic-ai/claude-code
 	apk cache clean
 	rm -rf /usr/local/lib/node_modules/npm/man/
 	find . -type f -name '*.md' -delete 2> /dev/null
 	adduser -D claude
+	curl -LsSf https://astral.sh/uv/install.sh | sudo -u claude sh
 EOT
 
 buildah config \
