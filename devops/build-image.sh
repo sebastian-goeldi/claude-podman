@@ -7,7 +7,7 @@ IMAGE=claude-code
 #apk add --no-cache dash
 buildah run "$CONTAINER" sh <<EOT
 	npm config set os linux
-	apk add --no-cache zsh bash coreutils git sudo
+	apk add --no-cache zsh bash coreutils git sudo curl
 	npm --os=linux install --omit=dev --no-audit --no-fund -g @anthropic-ai/claude-code
 	apk cache clean
 	rm -rf /usr/local/lib/node_modules/npm/man/
