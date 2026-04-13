@@ -11,7 +11,7 @@ First, download and install podman. Installation is easy and secure with curl
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf \
   https://raw.githubusercontent.com/sebastian-goeldi/claude-podman/refs/heads/main/bin/claude |
-  tee | $HOME/.local/bin/claude-podman
+  tee $HOME/.local/bin/claude-podman
 chmod a+x $HOME/.local/bin/claude-podman
 ```
 
