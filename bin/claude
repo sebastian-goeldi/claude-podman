@@ -41,6 +41,10 @@ while [[ $# -gt 0 ]]; do
 		INIT_SCRIPT="$2"
 		shift 2
 		;;
+	--init-script-claude)
+		INIT_SCRIPT_CLAUDE="$2"
+		shift 2
+		;;
 	--apk-packages)
 		APK_PACKAGES="$2"
 		shift 2
@@ -77,5 +81,10 @@ if [ -n "$INIT_SCRIPT" ]; then
 	podman cp "$INIT_SCRIPT" "$NAME:/root/init.sh"
 	podman exec --user root:root "$NAME" zsh /root/init.sh
 fi
+if [ -n "$INIT_SCRIPT_CLAUDE" ]; then
+	podman cp "$INIT_SCRIPT_CLAUDE" "$NAME:/home/claude/init.sh"
+	podman exec --user claude:claude "$NAME" zsh /home/claude/init.sh
+fi
+
 
 podman container attach "$NAME"

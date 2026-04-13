@@ -1,23 +1,21 @@
 #!/bin/sh
 
 CONTAINER=$(buildah from docker.io/node:current-alpine)
-CLAUDE_VERSION=$(npm info @anthropic-ai/claude-code --json | jq .version -r)
+CLAUDE_VERSION=1.0
 IMAGE=claude-code
 
 #apk add --no-cache dash
 buildah run "$CONTAINER" sh <<EOT
-	npm config set os linux
-	apk add --no-cache zsh bash coreutils git sudo curl
-	npm --os=linux install --omit=dev --no-audit --no-fund -g @anthropic-ai/claude-code
+	apk add --no-cache bash coreutils git sudo curl
 	apk cache clean
-	rm -rf /usr/local/lib/node_modules/npm/man/
 	find . -type f -name '*.md' -delete 2> /dev/null
 	adduser -D claude
+	curl -fsSL https://claude.ai/install.sh | sudo -u claude bash
 	curl -LsSf https://astral.sh/uv/install.sh | sudo -u claude sh
 EOT
 
 buildah config \
-	--author "Evan Carroll" \
+	--author "Sebastian Goeldi" \
 	--env "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
 	--env "SHELL=/bin/zsh" \
 	--env "DISABLE_TELEMETRY=1" \
