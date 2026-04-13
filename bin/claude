@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
 		curl --proto '=https' --tlsv1.2 -sSf \
 			https://raw.githubusercontent.com/sebastian-goeldi/claude-podman/refs/heads/main/bin/claude |
 			tee $HOME/.local/bin/claude-podman >/dev/null
-		sudo chmod a+x $HOME/.local/bin/claude-podman
+		chmod a+x $HOME/.local/bin/claude-podman
 		echo "Updated"
 		exit 0
 		;;
