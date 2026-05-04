@@ -69,13 +69,13 @@ podman run \
 	-ti \
 	--detach \
 	--user claude \
-	--userns=keep-id:uid=1001,gid=1001 \
+	--userns=keep-id \ \
 	$PODMAN_ARGS \
 	"$IMAGE" "$@"
 
 if [ -n "$APK_PACKAGES" ]; then
 	APK_PACKAGES=$(echo $APK_PACKAGES | tr -s ', ' ' ')
-	podman exec --user root:root "$NAME" /bin/zsh -c "apk update; apk add $APK_PACKAGES"
+	podman exec --user root:root "$NAME" /bin/bash -c "apt-get update; apt-get install -y $APK_PACKAGES"
 fi
 if [ -n "$INIT_SCRIPT" ]; then
 	podman cp "$INIT_SCRIPT" "$NAME:/root/init.sh"
