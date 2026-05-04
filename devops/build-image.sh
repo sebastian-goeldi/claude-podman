@@ -1,30 +1,31 @@
 #!/bin/sh
-
-CONTAINER=$(buildah from docker.io/node:current-alpine)
+CONTAINER=$(buildah from docker.io/debian:stable-slim)
 CLAUDE_VERSION=1.0
 IMAGE=claude-code
 
-#apk add --no-cache dash
-buildah run "$CONTAINER" sh <<EOT
-	apk add --no-cache bash coreutils git sudo curl
-	apk cache clean
-	find . -type f -name '*.md' -delete 2> /dev/null
-	adduser -D claude
+buildah run "$CONTAINER" sh <<'EOT'
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update
+	apt-get install -y bash curl sudo adduser net-tools
+	apt-get clean
+	find / -type f -name '*.md' -delete 2>/dev/null
+	adduser --disabled-password --gecos "" claude
 	curl -fsSL https://claude.ai/install.sh | sudo -u claude bash
 	curl -LsSf https://astral.sh/uv/install.sh | sudo -u claude sh
+	sudo -u claude echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/claude/.bashrc
 EOT
 
 buildah config \
 	--author "Sebastian Goeldi" \
 	--env "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-	--env "SHELL=/bin/zsh" \
+	--env "SHELL=/bin/bash" \
 	--env "DISABLE_TELEMETRY=1" \
 	--env "DISABLE_AUTOUPDATER=1" \
 	--cmd "" \
-	--entrypoint '[ "/usr/local/bin/node", "--no-warnings", "--enable-source-maps", "/usr/local/bin/claude" ]' \
+	--entrypoint '[ "/usr/local/bin/bash", "--no-warnings", "--enable-source-maps", "/usr/local/bin/claude" ]' \
 	--annotation "org.anthropic.claudecode.version=$CLAUDE_VERSION" \
 	--annotation "org.opencontainers.image.title=claude-code" \
-	--annotation "org.opencontainers.image.description=Claude Code on Alpine ready for rootless podman" \
+	--annotation "org.opencontainers.image.description=Claude Code on Debian ready for rootless podman" \
 	--annotation "org.opencontainers.image.url=https://github.com/EvanCarroll/claude-podman" \
 	--annotation "org.opencontainers.image.source=https://github.com/EvanCarroll/claude-podman" \
 	--annotation "org.opencontainers.image.documentation=https://github.com/EvanCarroll/claude-podman/blob/main/README.md" \
@@ -36,8 +37,8 @@ buildah commit \
 	--rm \
 	"$CONTAINER" "$IMAGE"
 
-buildah tag "$IMAGE" "$CLAUDE_VERSION"
+buildah tag "$IMAGE" "${IMAGE}:${CLAUDE_VERSION}"
 
-echo Done!
-echo ${IMAGE}:${CLAUDE_VERSION}
-echo To use this image run /bin/claude
+echo "Done!"
+echo "${IMAGE}:${CLAUDE_VERSION}"
+echo "To use this image run /bin/claude"
