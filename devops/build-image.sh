@@ -22,7 +22,7 @@ buildah config \
 	--env "DISABLE_TELEMETRY=1" \
 	--env "DISABLE_AUTOUPDATER=1" \
 	--cmd "" \
-	--entrypoint '[ "/usr/local/bin/bash", "--no-warnings", "--enable-source-maps", "/usr/local/bin/claude" ]' \
+	--entrypoint '[ "bash", "--no-warnings", "--enable-source-maps", "/usr/local/bin/claude" ]' \
 	--annotation "org.anthropic.claudecode.version=$CLAUDE_VERSION" \
 	--annotation "org.opencontainers.image.title=claude-code" \
 	--annotation "org.opencontainers.image.description=Claude Code on Debian ready for rootless podman" \
