@@ -69,7 +69,7 @@ podman run \
 	-ti \
 	--detach \
 	--user claude \
-	--userns=keep-id \ \
+	--userns=keep-id \
 	$PODMAN_ARGS \
 	"$IMAGE" "$@"
 
