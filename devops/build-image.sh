@@ -6,7 +6,7 @@ IMAGE=claude-code
 buildah run "$CONTAINER" sh <<'EOT'
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update
-	apt-get install -y bash coreutils curl sudo adduser net-tools
+	apt-get install -y bash coreutils curl sudo adduser net-tools git
 	apt-get clean
 	find / -type f -name '*.md' -delete 2>/dev/null
 	adduser --disabled-password --gecos "" claude
