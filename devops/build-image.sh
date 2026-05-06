@@ -6,7 +6,7 @@ IMAGE=claude-code
 buildah run "$CONTAINER" sh <<'EOT'
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update
-	apt-get install -y bash coreutils curl sudo adduser net-tools git
+	apt-get install -y bash coreutils curl sudo adduser net-tools git build-essential graphviz graphviz-dev gcc g++
 	apt-get clean
 	find / -type f -name '*.md' -delete 2>/dev/null
 	adduser --disabled-password --gecos "" claude
@@ -23,6 +23,9 @@ buildah config \
 	--env "SHELL=/bin/bash" \
 	--env "DISABLE_TELEMETRY=1" \
 	--env "DISABLE_AUTOUPDATER=1" \
+	--env "OPENBLAS_NUM_THREADS=1" \
+	--env "OMP_NUM_THREADS=1" \
+	--env "MKL_NUM_THREADS=1" \
 	--cmd "[]" \
 	--entrypoint '[ "claude" ]' \
 	--annotation "org.anthropic.claudecode.version=$CLAUDE_VERSION" \
