@@ -15,6 +15,7 @@ buildah run "$CONTAINER" sh <<'EOT'
 	chown -R claude:claude /home/claude
 	sudo -u claude -i bash -c 'curl -fsSL https://claude.ai/install.sh | bash'
 	sudo -u claude -i bash -c 'curl -LsSf https://astral.sh/uv/install.sh | bash'
+	sudo -u claude -i bash -c 'curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh'
 EOT
 
 buildah config \
