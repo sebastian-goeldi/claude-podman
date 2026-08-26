@@ -5,8 +5,10 @@ IMAGE=claude-code
 
 buildah run "$CONTAINER" sh <<'EOT'
 	export DEBIAN_FRONTEND=noninteractive
+	apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+  apt-add-repository https://cli.github.com/packages
 	apt-get update
-	apt-get install -y bash coreutils curl sudo adduser net-tools git build-essential graphviz graphviz-dev gcc g++
+	apt-get install -y bash coreutils curl sudo adduser net-tools git build-essential graphviz graphviz-dev gcc g++ gh
 	apt-get clean
 	find / -type f -name '*.md' -delete 2>/dev/null
 	adduser --disabled-password --gecos "" claude
