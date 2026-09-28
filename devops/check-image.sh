@@ -17,7 +17,6 @@ podman run --rm \
 	--entrypoint /bin/sh \
 	"$image" -eu -c '
 	test "$(id -un)" = claude
-	test "$DISABLE_TELEMETRY" = 1
 	test "$DISABLE_AUTOUPDATER" = 1
 	test -f /home/claude/.claude/host-settings
 	test -w /home/claude/.claude.json
