@@ -18,6 +18,13 @@ jobs:
     - name: Check out repository
       uses: actions/checkout@v4
 
+    - name: Check wrapper
+      run: |
+        bash -n bin/claude
+        sh -n devops/build-image.sh
+        sh -n devops/check-image.sh
+        node --test devops/check-wrapper.cjs
+
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
       with:
@@ -29,8 +36,11 @@ jobs:
       env:
         STORAGE_DRIVER: vfs
       run: |
+        set -o pipefail
         # Run the build script
         VERSION=$(./devops/build-image.sh | tail -n2 | head -n1 | cut -d: -f2)
+
+        sh devops/check-image.sh
         
         # Tag the image for GHCR
         REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')

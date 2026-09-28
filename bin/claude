@@ -4,24 +4,37 @@
 IMAGE="ghcr.io/sebastian-goeldi/claude-podman/claude-code:latest"
 NAME="claudecode-$(uuidgen -r | cut -d- -f1)"
 INIT_SCRIPT=""
+INIT_SCRIPT_CLAUDE=""
 APK_PACKAGES=""
 PODMAN_ARGS=""
+REMOTE_MODE=false
+
+require_value() {
+	if [[ $# -lt 2 || -z "$2" ]]; then
+		printf 'Missing value for %s\n' "$1" >&2
+		exit 2
+	fi
+}
 
 # Process arguments
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--help)
 		cat <<-'EOT'
-			Usage: claude [OPTIONS]
+			Usage: claude [OPTIONS] [--] [CLAUDE_ARGS...]
 
 			Run Claude Code in a Podman container
 
 			Options:
 			  --local              Use local image 'claude-code:latest' instead of remote
-			  --init-script FILE   Execute initialization script
-			  --apk-packages LIST  Install additional Alpine packages (comma or space separated)
+			  --remote             Start an interactive session with Remote Control enabled
+			  --init-script FILE   Execute initialization script as root
+			  --init-script-claude FILE  Execute initialization script as claude user
+			  --apk-packages LIST  Install additional Debian packages (comma or space separated)
 			  --podman-arg ARG     Pass additional argument to podman
+			  --self-update        Update this wrapper
 			  --help               Display this help message
+			  --                   Pass remaining arguments directly to Claude
 		EOT
 		exit 0
 		;;
@@ -37,19 +50,31 @@ while [[ $# -gt 0 ]]; do
 		IMAGE="claude-code:latest"
 		shift
 		;;
+	--remote)
+		REMOTE_MODE=true
+		shift
+		;;
+	--)
+		shift
+		break
+		;;
 	--init-script)
+		require_value "$@"
 		INIT_SCRIPT="$2"
 		shift 2
 		;;
 	--init-script-claude)
+		require_value "$@"
 		INIT_SCRIPT_CLAUDE="$2"
 		shift 2
 		;;
 	--apk-packages)
+		require_value "$@"
 		APK_PACKAGES="$2"
 		shift 2
 		;;
 	--podman-arg)
+		require_value "$@"
 		PODMAN_ARGS="$PODMAN_ARGS $2"
 		shift 2
 		;;
@@ -58,6 +83,21 @@ while [[ $# -gt 0 ]]; do
 		;;
 	esac
 done
+
+# Podman needs existing bind-mount sources, including on the first login.
+mkdir -p "$HOME/.claude" || exit "$?"
+if [[ ! -e "$HOME/.claude.json" ]]; then
+	(umask 077; set -o noclobber; printf '{}\n' > "$HOME/.claude.json") || exit "$?"
+fi
+
+# Keep remote mode alive until initialization finishes, then run Claude in
+# the foreground so startup messages and the session URL reach the terminal.
+CONTAINER_ARGS=("$@")
+ENTRYPOINT_ARGS=()
+if "$REMOTE_MODE"; then
+	ENTRYPOINT_ARGS=(--entrypoint /bin/sleep)
+	CONTAINER_ARGS=(infinity)
+fi
 
 podman run \
 	-v "${HOME}/.claude:/home/claude/.claude" \
@@ -71,20 +111,36 @@ podman run \
 	--user claude \
 	--userns=keep-id \
 	$PODMAN_ARGS \
-	"$IMAGE" "$@"
+	"${ENTRYPOINT_ARGS[@]}" \
+	"$IMAGE" "${CONTAINER_ARGS[@]}" || exit "$?"
+
+cleanup_container() {
+	podman stop "$NAME" >/dev/null 2>&1 || true
+}
+trap cleanup_container EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if [ -n "$APK_PACKAGES" ]; then
 	APK_PACKAGES=$(echo $APK_PACKAGES | tr -s ', ' ' ')
-	podman exec --user root:root "$NAME" /bin/bash -c "apt-get update; apt-get install -y $APK_PACKAGES"
+	podman exec --user root:root "$NAME" /bin/bash -c "apt-get update && apt-get install -y $APK_PACKAGES" || exit "$?"
 fi
 if [ -n "$INIT_SCRIPT" ]; then
-	podman cp "$INIT_SCRIPT" "$NAME:/root/init.sh"
-	podman exec --user root:root "$NAME" bash /root/init.sh
+	podman cp "$INIT_SCRIPT" "$NAME:/root/init.sh" || exit "$?"
+	podman exec --user root:root "$NAME" bash /root/init.sh || exit "$?"
 fi
 if [ -n "$INIT_SCRIPT_CLAUDE" ]; then
-	podman cp "$INIT_SCRIPT_CLAUDE" "$NAME:/home/claude/init.sh"
-	podman exec --user claude:claude "$NAME" bash /home/claude/init.sh
+	podman cp "$INIT_SCRIPT_CLAUDE" "$NAME:/home/claude/init.sh" || exit "$?"
+	podman exec --user claude:claude "$NAME" bash /home/claude/init.sh || exit "$?"
 fi
 
+if "$REMOTE_MODE"; then
+	# Supply the optional session name explicitly so a positional prompt cannot
+	# be consumed as the value of --remote-control.
+	podman exec -it --user claude "$NAME" claude --remote-control "${PWD##*/}" "$@"
+	exit "$?"
+fi
 
+# Preserve ordinary mode's existing attach/detach lifecycle.
+trap - EXIT INT TERM
 podman container attach "$NAME"

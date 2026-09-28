@@ -1,30 +1,42 @@
 #!/bin/sh
+set -eu
+
 CONTAINER=$(buildah from docker.io/debian:stable-slim)
+trap 'buildah rm "$CONTAINER" >/dev/null 2>&1 || true' EXIT
 CLAUDE_VERSION=1.0
 IMAGE=claude-code
 
-buildah run "$CONTAINER" sh <<'EOT'
+buildah run "$CONTAINER" sh -eu <<'EOT'
 	export DEBIAN_FRONTEND=noninteractive
-	apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-  apt-add-repository https://cli.github.com/packages
 	apt-get update
-	apt-get install -y bash coreutils curl sudo adduser net-tools git build-essential graphviz graphviz-dev gcc g++ gh
+	apt-get install -y bash coreutils ca-certificates curl sudo adduser net-tools procps git build-essential graphviz graphviz-dev gcc g++ gh bubblewrap ripgrep jq xz-utils
 	apt-get clean
-	find / -type f -name '*.md' -delete 2>/dev/null
 	adduser --disabled-password --gecos "" claude
 	mkdir -p /home/claude/.claude
-	echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/claude/.bashrc
+	echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> /home/claude/.bashrc
 	chown -R claude:claude /home/claude
-	sudo -u claude -i bash -c 'curl -fsSL https://claude.ai/install.sh | bash'
-	sudo -u claude -i bash -c 'curl -LsSf https://astral.sh/uv/install.sh | bash'
-	sudo -u claude -i bash -c 'curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh'
+	sudo -u claude -i bash -o pipefail -c 'curl -fsSL https://claude.ai/install.sh | bash -s -- latest'
+	sudo -u claude -i bash -o pipefail -c 'curl -LsSf https://astral.sh/uv/install.sh | bash'
+	sudo -u claude -i bash -o pipefail -c 'curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y'
+	NODE_VERSION=22
+	case "$(dpkg --print-architecture)" in
+		amd64) NODE_ARCH=x64 ;;
+		arm64) NODE_ARCH=arm64 ;;
+		*) echo 'Unsupported Node.js architecture' >&2; exit 1 ;;
+	esac
+	curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VERSION}.x/SHASUMS256.txt" -o /tmp/SHASUMS256.txt
+	NODE_FILE=$(awk -v suffix="-linux-${NODE_ARCH}.tar.xz" 'substr($2, length($2)-length(suffix)+1) == suffix {print $2}' /tmp/SHASUMS256.txt)
+	test -n "$NODE_FILE"
+	curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VERSION}.x/${NODE_FILE}" -o "/tmp/$NODE_FILE"
+	(cd /tmp && grep " $NODE_FILE\$" SHASUMS256.txt | sha256sum -c -)
+	tar -xJf "/tmp/$NODE_FILE" -C /usr/local --strip-components=1
+	rm -f "/tmp/$NODE_FILE" /tmp/SHASUMS256.txt
 EOT
 
 buildah config \
 	--author "Sebastian Goeldi" \
-	--env "PATH=/home/claude/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+	--env "PATH=/home/claude/.local/bin:/home/claude/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
 	--env "SHELL=/bin/bash" \
-	--env "DISABLE_TELEMETRY=1" \
 	--env "DISABLE_AUTOUPDATER=1" \
 	--env "OPENBLAS_NUM_THREADS=1" \
 	--env "OMP_NUM_THREADS=1" \
