@@ -10,7 +10,7 @@ const container = 'claudecode-00000000';
 
 // Run the real wrapper with fake Podman and Claude processes to exercise
 // startup ordering, argument boundaries, failures, and container cleanup.
-function run(args, overrides = {}) {
+function run(args, overrides = {}, { systemd = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-wrapper-'));
   const home = path.join(dir, 'home');
   fs.mkdirSync(home);
@@ -27,6 +27,13 @@ if (tool === 'uuidgen') {
   process.exit(0);
 }
 fs.appendFileSync(process.env.WRAPPER_TEST_LOG, JSON.stringify({tool, args}) + '\\n');
+if (tool === 'systemd-inhibit') {
+  if (args[0] === '--list') process.exit(Number(process.env.MOCK_INHIBIT_LIST_EXIT || 0));
+  if (process.env.MOCK_INHIBIT_EXIT) process.exit(Number(process.env.MOCK_INHIBIT_EXIT));
+  const command = args.slice(args.findIndex(arg => !arg.startsWith('--')));
+  const result = spawnSync(command[0], command.slice(1), {stdio: 'inherit'});
+  process.exit(result.status ?? 1);
+}
 if (tool === 'claude') {
   if (process.env.MOCK_REMOTE_EXIT) {
     console.error('Remote startup failed');
@@ -49,8 +56,16 @@ if (args[0] === 'exec') {
   process.exit(Number(process.env.MOCK_INIT_EXIT || 0));
 }
 `, { mode: 0o755 });
-  for (const tool of ['podman', 'claude', 'uuidgen']) {
+  for (const tool of ['podman', 'claude', 'uuidgen', ...(systemd ? ['systemd-inhibit'] : [])]) {
     fs.symlinkSync(mock, path.join(dir, tool));
+  }
+  // Without systemd, PATH holds only the mocks and the real tools they need, so
+  // a host's own systemd-inhibit cannot be found.
+  if (!systemd) {
+    for (const tool of ['bash', 'cut', 'mkdir', 'node']) {
+      const real = spawnSync('bash', ['-c', `command -v ${tool}`], { encoding: 'utf8' }).stdout.trim();
+      fs.symlinkSync(real, path.join(dir, tool));
+    }
   }
   try {
     const result = spawnSync('bash', [wrapper, ...args], {
@@ -58,7 +73,7 @@ if (args[0] === 'exec') {
       timeout: 10000,
       env: {
         ...process.env,
-        PATH: `${dir}:${process.env.PATH}`,
+        PATH: systemd ? `${dir}:${process.env.PATH}` : dir,
         HOME: home,
         WRAPPER_TEST_LOG: log,
         ...overrides,
@@ -77,7 +92,8 @@ if (args[0] === 'exec') {
 }
 
 const claudeCalls = result => result.calls.filter(call => call.tool === 'claude');
-const stopped = result => result.calls.filter(call => call.tool === 'podman' && call.args[0] === 'stop');
+const locks = result => result.calls.filter(call => call.tool === 'systemd-inhibit' && call.args[0] !== '--list');
+const stopped = result =>result.calls.filter(call => call.tool === 'podman' && call.args[0] === 'stop');
 
 test('remote mode starts an interactive session, preserves arguments, and cleans up', () => {
   const args = ['--model', 'example-model', '--append-system-prompt', 'notice="two words"', 'Explain "this"\n$(false) *'];
@@ -185,6 +201,44 @@ test('native Remote Control server command is forwarded unchanged', () => {
   const result = run(['--local', 'remote-control', '--name', 'My Project']);
   assert.equal(result.status, 0);
   assert.deepEqual(result.calls[0].args.slice(-4), ['claude-code:latest', 'remote-control', '--name', 'My Project']);
+});
+
+test('inhibit mode holds a sleep lock around the whole session', () => {
+  const result = run(['--inhibit', '--local', '--remote', '--continue'], { MOCK_SESSION_EXIT: '42' });
+  assert.equal(result.status, 42, result.stderr);
+  assert.deepEqual(result.calls[0], { tool: 'systemd-inhibit', args: ['--list'] });
+  assert.equal(locks(result).length, 1);
+  assert.ok(locks(result)[0].args.includes('--what=sleep'));
+  assert.deepEqual(locks(result)[0].args.slice(-5), [wrapper, '--inhibit', '--local', '--remote', '--continue']);
+  assert.ok(result.calls.indexOf(locks(result)[0]) < result.calls.findIndex(call => call.args[0] === 'run'));
+  assert.equal(result.calls.filter(call => call.args[0] === 'run').length, 1);
+  assert.deepEqual(claudeCalls(result)[0].args.slice(-1), ['--continue']);
+  assert.equal(stopped(result).length, 1);
+});
+
+test('inhibit without systemd warns and runs the session anyway', () => {
+  const result = run(['--inhibit', '--remote', '--continue'], {}, { systemd: false });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Warning: systemd-inhibit not found; --inhibit has no effect/);
+  assert.equal(result.calls.filter(call => call.args[0] === 'run').length, 1);
+  assert.deepEqual(claudeCalls(result)[0].args.slice(-1), ['--continue']);
+  assert.equal(stopped(result).length, 1);
+});
+
+test('inhibit without a reachable logind warns and runs the session anyway', () => {
+  const result = run(['--inhibit', '--remote', '--continue'], { MOCK_INHIBIT_LIST_EXIT: '1' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Warning: systemd-logind not reachable; --inhibit has no effect/);
+  assert.equal(locks(result).length, 0);
+  assert.deepEqual(claudeCalls(result)[0].args.slice(-1), ['--continue']);
+  assert.equal(stopped(result).length, 1);
+});
+
+test('a refused lock skips container startup', () => {
+  const result = run(['--inhibit', 'rc'], { MOCK_INHIBIT_EXIT: '1' });
+  assert.equal(result.status, 1);
+  assert.deepEqual(result.calls.map(call => call.tool), ['systemd-inhibit', 'systemd-inhibit']);
+  assert.equal(locks(result).length, 1);
 });
 
 test('Podman long options remain supported', () => {

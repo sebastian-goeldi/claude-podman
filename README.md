@@ -82,6 +82,25 @@ claude-podman remote-control --name "My Project"
 claude-podman -- --remote-control "My Project"
 ```
 
+Preventing sleep
+----
+
+Keep the host from suspending or hibernating while a session runs, for example
+while you use it through Remote Control:
+
+```sh
+claude-podman --inhibit rc
+```
+
+The wrapper re-runs itself under `systemd-inhibit --what=sleep`, so the lock is
+released when the wrapper exits. Without `systemd-inhibit` or a running
+systemd-logind (for example on WSL without systemd), the wrapper warns that
+`--inhibit` has no effect and starts the session anyway. Screen blanking and locking still happen, and
+shutdown is not blocked. Closing a laptop lid can still suspend it; to block that
+too, call `systemd-inhibit --what=sleep:handle-lid-switch claude-podman ...`
+yourself. Detaching from an ordinary session with Ctrl-P Ctrl-Q ends the wrapper
+and releases the lock while the container keeps running.
+
 Building locally
 ----
 
