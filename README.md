@@ -31,7 +31,11 @@ This provides the following benefits:
 
 This image runs in rootless podman, and even inside rootless podman it runs as
 a non-root user inside the container. Telemetry and automatic updates are disabled
-in the image. Rebuild or pull a new image to update Claude Code.
+in the image. Instead, the wrapper runs `claude update` before starting each
+session. The container is removed on exit, so the update is downloaded again
+every time. If the update fails, for example when offline, the wrapper warns and
+starts the version installed in the image. Rebuild or pull a new image to update
+that version.
 
 Claude's native installation stays in `/home/claude/.local/share/claude`, outside
 the mounted settings directory. Mounting your host settings does not hide the

@@ -112,10 +112,14 @@ if [[ ! -e "$HOME/.claude.json" ]]; then
 	(umask 077; set -o noclobber; printf '{}\n' > "$HOME/.claude.json") || exit "$?"
 fi
 
+# Update Claude Code before every session. A failed update (for example when
+# offline) still starts the version installed in the image.
+LAUNCH_SCRIPT='claude update || echo "Warning: claude update failed; starting installed version" >&2; exec claude "$@"'
+
 # Keep remote mode alive until initialization finishes, then run Claude in
 # the foreground so startup messages and the session URL reach the terminal.
-CONTAINER_ARGS=("$@")
-ENTRYPOINT_ARGS=()
+ENTRYPOINT_ARGS=(--entrypoint /bin/bash)
+CONTAINER_ARGS=(-c "$LAUNCH_SCRIPT" claude "$@")
 if "$REMOTE_MODE"; then
 	ENTRYPOINT_ARGS=(--entrypoint /bin/sleep)
 	CONTAINER_ARGS=(infinity)
@@ -159,7 +163,8 @@ fi
 if "$REMOTE_MODE"; then
 	# Supply the optional session name explicitly so a positional prompt cannot
 	# be consumed as the value of --remote-control.
-	podman exec -it --user claude "$NAME" claude --remote-control "${PWD##*/}" "$@"
+	podman exec -it --user claude "$NAME" bash -c "$LAUNCH_SCRIPT" claude \
+		--remote-control "${PWD##*/}" "$@"
 	exit "$?"
 fi
 
