@@ -3,6 +3,9 @@ claude-podman
 
 Claude for the security-conscious: run [claude-code, the claude cli tool](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview), in a rootless [podman](https://podman.io/) container.
 
+Forked from [EvanCarroll/claude-podman](https://github.com/EvanCarroll/claude-podman)
+by Evan Carroll.
+
 Installation
 ----
 
