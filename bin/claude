@@ -8,6 +8,8 @@ INIT_SCRIPT_CLAUDE=""
 APK_PACKAGES=""
 PODMAN_ARGS=""
 REMOTE_MODE=false
+INHIBIT=false
+ORIGINAL_ARGS=("$@")
 
 require_value() {
 	if [[ $# -lt 2 || -z "$2" ]]; then
@@ -28,6 +30,7 @@ while [[ $# -gt 0 ]]; do
 			Options:
 			  --local              Use local image 'claude-code:latest' instead of remote
 			  --remote             Start an interactive session with Remote Control enabled
+			  --inhibit            Block suspend and hibernation while the wrapper runs
 			  --init-script FILE   Execute initialization script as root
 			  --init-script-claude FILE  Execute initialization script as claude user
 			  --apk-packages LIST  Install additional Debian packages (comma or space separated)
@@ -52,6 +55,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--remote)
 		REMOTE_MODE=true
+		shift
+		;;
+	--inhibit)
+		INHIBIT=true
 		shift
 		;;
 	--)
@@ -84,16 +91,35 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+# Re-run the wrapper under systemd-inhibit so the sleep lock lasts exactly as
+# long as this process. The marker stops the inner run from wrapping again.
+if "$INHIBIT" && [[ -z "${CLAUDE_PODMAN_INHIBITED:-}" ]]; then
+	if ! command -v systemd-inhibit >/dev/null; then
+		printf 'Warning: systemd-inhibit not found; --inhibit has no effect\n' >&2
+	elif ! systemd-inhibit --list >/dev/null 2>&1; then
+		# Listing needs no privileges, so failure means logind is unreachable.
+		printf 'Warning: systemd-logind not reachable; --inhibit has no effect\n' >&2
+	else
+		export CLAUDE_PODMAN_INHIBITED=1
+		exec systemd-inhibit --what=sleep --who=claude-podman \
+			--why="Claude Code session in ${PWD##*/}" "$0" "${ORIGINAL_ARGS[@]}"
+	fi
+fi
+
 # Podman needs existing bind-mount sources, including on the first login.
 mkdir -p "$HOME/.claude" || exit "$?"
 if [[ ! -e "$HOME/.claude.json" ]]; then
 	(umask 077; set -o noclobber; printf '{}\n' > "$HOME/.claude.json") || exit "$?"
 fi
 
+# Update Claude Code before every session. A failed update (for example when
+# offline) still starts the version installed in the image.
+LAUNCH_SCRIPT='claude update || echo "Warning: claude update failed; starting installed version" >&2; exec claude "$@"'
+
 # Keep remote mode alive until initialization finishes, then run Claude in
 # the foreground so startup messages and the session URL reach the terminal.
-CONTAINER_ARGS=("$@")
-ENTRYPOINT_ARGS=()
+ENTRYPOINT_ARGS=(--entrypoint /bin/bash)
+CONTAINER_ARGS=(-c "$LAUNCH_SCRIPT" claude "$@")
 if "$REMOTE_MODE"; then
 	ENTRYPOINT_ARGS=(--entrypoint /bin/sleep)
 	CONTAINER_ARGS=(infinity)
@@ -137,7 +163,8 @@ fi
 if "$REMOTE_MODE"; then
 	# Supply the optional session name explicitly so a positional prompt cannot
 	# be consumed as the value of --remote-control.
-	podman exec -it --user claude "$NAME" claude --remote-control "${PWD##*/}" "$@"
+	podman exec -it --user claude "$NAME" bash -c "$LAUNCH_SCRIPT" claude \
+		--remote-control "${PWD##*/}" "$@"
 	exit "$?"
 fi
 
